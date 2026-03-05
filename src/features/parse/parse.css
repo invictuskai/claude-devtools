@@ -1,0 +1,7 @@
+@import "tailwindcss" layer(tailwind);
+
+@layer tailwind {
+  .mono {
+    font-family: 'Fira Code', monospace;
+  }
+}

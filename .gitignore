@@ -1,0 +1,7 @@
+traces
+node_modules
+.claude
+dist
+.idea
+server/templates/
+server/requestLog/
