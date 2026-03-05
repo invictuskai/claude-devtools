@@ -5,3 +5,5 @@ dist
 .idea
 server/templates/
 server/requestLog/
+server/__pycache__/
+package-lock.json

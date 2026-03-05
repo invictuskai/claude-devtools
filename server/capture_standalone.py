@@ -96,7 +96,7 @@ def _start_ws_server():
 
     async def _serve():
         import websockets
-        server = await websockets.serve(_handler, "0.0.0.0", WS_PORT, path="/ws")
+        server = await websockets.serve(_handler, "127.0.0.1", WS_PORT, path="/ws")
         print(f"[WS] ✓ WebSocket 服务器启动: ws://localhost:{WS_PORT}/ws")
         await server.wait_closed()
 

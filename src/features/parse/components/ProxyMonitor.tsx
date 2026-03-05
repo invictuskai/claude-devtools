@@ -8,11 +8,11 @@ import {
     TemplateInfo,
 } from '../services/proxyClient';
 
-const WS_URL = 'ws://localhost:5555/ws';
+const WS_URL = `ws://${window.location.hostname}:5555/ws`;
 
 // 格式化时间戳
 function formatTime(ts: number) {
-    return new Date(ts).toLocaleTimeString('zh-CN', { hour12: false });
+    return new Date(ts).toLocaleTimeString(undefined, { hour12: false });
 }
 
 // 格式化文件大小
@@ -321,16 +321,10 @@ const ProxyMonitor: React.FC = () => {
                 <div className="flex items-center gap-3">
                     <div className={`w-2.5 h-2.5 rounded-full ${connectionDot(connState)}`} />
                     <span className="text-xs font-medium text-slate-400">{connectionLabel[connState]}</span>
-                    <span className="text-xs text-slate-400">ws://localhost:5555/ws</span>
+                    <span className="text-xs text-slate-400">{WS_URL}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-400">{filteredRequests.length} 个请求</span>
-                    <button
-                        onClick={() => { setRequests([]); setSelectedId(null); }}
-                        className="px-3 py-1 text-[10px] font-semibold text-slate-400 hover:bg-[#1e293b] rounded-md border border-[#334155] transition-colors"
-                    >
-                        清空
-                    </button>
                     {(connState === 'disconnected' || connState === 'error') && (
                         <button
                             onClick={() => clientRef.current?.reconnect()}
@@ -345,15 +339,31 @@ const ProxyMonitor: React.FC = () => {
             {/* Session Tab 栏 */}
             {sessions.size > 0 && (
                 <div className="flex items-center gap-1 px-4 py-2 bg-[#111827] border-b border-[#1e293b] shrink-0 overflow-x-auto">
-                    <button
-                        onClick={() => setActiveSession('all')}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${activeSession === 'all'
-                            ? 'bg-indigo-600 text-white shadow-sm'
-                            : 'text-slate-400 hover:bg-[#1e293b]'
-                            }`}
-                    >
-                        全部 ({requests.length})
-                    </button>
+                    <div className="flex items-center gap-0.5">
+                        <button
+                            onClick={() => setActiveSession('all')}
+                            className={`px-3 py-1.5 text-xs font-semibold rounded-l-md transition-colors whitespace-nowrap ${activeSession === 'all'
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'text-slate-400 hover:bg-[#1e293b]'
+                                }`}
+                        >
+                            全部 ({requests.length})
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setRequests([]);
+                                setSelectedId(null);
+                            }}
+                            title="清空所有请求"
+                            className={`px-2 self-stretch flex items-center rounded-r-md transition-colors ${activeSession === 'all'
+                                ? 'bg-indigo-600 text-white hover:bg-indigo-500'
+                                : 'bg-[#1a2237] text-slate-400 hover:bg-[#1e293b] hover:text-slate-300'
+                                }`}
+                        >
+                            <span className="text-[10px]">&#x2715;</span>
+                        </button>
+                    </div>
                     {Array.from(sessions.entries()).map(([sid, info]) => (
                         <div key={sid} className="flex items-center gap-0.5">
                             <button
@@ -370,7 +380,7 @@ const ProxyMonitor: React.FC = () => {
                                     </div>
                                     {info.projectPath && (
                                         <span className={`text-[10px] font-normal truncate max-w-[260px] ${activeSession === sid ? 'text-indigo-200' : 'text-slate-400'}`} title={info.projectPath}>
-                                            📁 {info.projectPath}
+                                            {info.projectPath}
                                         </span>
                                     )}
                                 </div>
@@ -385,7 +395,7 @@ const ProxyMonitor: React.FC = () => {
                                         setTimeout(() => { btn.textContent = '📋'; }, 1000);
                                     }}
                                     title={`复制完整 Session ID: ${sid}`}
-                                    className={`px-2 self-stretch flex items-center rounded-r-md transition-colors ${activeSession === sid
+                                    className={`px-2 self-stretch flex items-center transition-colors ${activeSession === sid
                                         ? 'bg-indigo-600 text-white hover:bg-indigo-500'
                                         : 'bg-[#1a2237] text-slate-400 hover:bg-[#1e293b] hover:text-slate-300'
                                         }`}
@@ -393,6 +403,25 @@ const ProxyMonitor: React.FC = () => {
                                     📋
                                 </button>
                             )}
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRequests(prev => prev.filter(r => (r.sessionId || 'unknown') !== sid));
+                                    if (activeSession === sid) {
+                                        setActiveSession('all');
+                                    }
+                                    if (selectedId && requests.find(r => r.id === selectedId && (r.sessionId || 'unknown') === sid)) {
+                                        setSelectedId(null);
+                                    }
+                                }}
+                                title={`清空此会话的所有请求`}
+                                className={`px-2 self-stretch flex items-center rounded-r-md transition-colors ${activeSession === sid
+                                    ? 'bg-indigo-600 text-white hover:bg-red-500'
+                                    : 'bg-[#1a2237] text-slate-400 hover:bg-red-900/50 hover:text-red-300'
+                                    }`}
+                            >
+                                <span className="text-[10px]">&#x2715;</span>
+                            </button>
                         </div>
                     ))}
                 </div>
@@ -484,7 +513,7 @@ const ProxyMonitor: React.FC = () => {
                                 <div className="flex items-center gap-2 px-3 py-2 bg-amber-950/30 border border-amber-800/50 rounded-lg">
                                     <span className="text-xs">📄</span>
                                     <a
-                                        href={`http://localhost:5555/__proxy__/log/${selectedRequest.logFile}`}
+                                        href={`http://${window.location.hostname}:5555/__proxy__/log/${selectedRequest.logFile}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-xs font-mono text-amber-400 hover:text-amber-300 hover:underline truncate"

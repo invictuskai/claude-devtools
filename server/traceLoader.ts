@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import readline from 'readline';
 
@@ -78,7 +79,7 @@ export interface SessionData {
   subagents: Record<string, TraceEvent[]>;
 }
 
-const DEFAULT_TRACES_DIR = path.join(process.env.HOME ?? '~', '.claude', 'projects');
+const DEFAULT_TRACES_DIR = path.join(os.homedir(), '.claude', 'projects');
 export const TRACES_DIR = process.argv[2]
   ? path.resolve(process.argv[2])
   : process.env.TRACES_DIR

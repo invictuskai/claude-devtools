@@ -14,7 +14,9 @@ interface Props {
 }
 
 function formatProjectName(name: string): string {
-  return name.replace(/--/, ':\\').replace(/-/g, '\\');
+  const isWin = navigator.platform.startsWith('Win');
+  const sep = isWin ? '\\' : '/';
+  return name.replace(/--/, `:${sep}`).replace(/-/g, sep);
 }
 
 export function Sidebar({ projects, selectedProject, selectedSession, onSelectProject, onSelectSession, onDeleteSession }: Props) {

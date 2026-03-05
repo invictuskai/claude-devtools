@@ -2,7 +2,7 @@ import express from 'express';
 import { listProjects, listSessions, loadSession, deleteSession, TRACES_DIR } from './traceLoader.js';
 
 const app = express();
-const PORT = 3001;
+const PORT = parseInt(process.env.API_PORT || '3001', 10);
 
 app.use(express.json());
 
@@ -45,7 +45,7 @@ app.delete('/api/projects/:project/sessions/:sessionId', (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`API server running at http://localhost:${PORT}`);
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`API server running at http://127.0.0.1:${PORT}`);
   console.log(`Reading traces from: ${TRACES_DIR}`);
 });

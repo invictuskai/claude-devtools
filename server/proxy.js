@@ -66,7 +66,18 @@ function extractSessionMeta(record) {
   } catch { /* 忽略 */ }
 }
 
+// 将项目路径转为安全的目录名：取最后两级路径，用 _ 连接
+function sanitizeProjectDir(projectPath) {
+  if (!projectPath) return 'unknown-project';
+  // 统一分隔符，取最后两级
+  const parts = projectPath.replace(/\\/g, '/').split('/').filter(Boolean);
+  const tail = parts.slice(-2).join('_');
+  // 替换非法文件名字符
+  return tail.replace(/[<>:"|?*]/g, '_') || 'unknown-project';
+}
+
 // 将请求/响应记录写入日志文件（纯文本格式，与 claudecode-parse 的 capture.py 一致）
+// 按项目路径 + session ID 分子目录保存：requestLog/{project}/{sessionId}/{filename}.log
 function saveRequestLog(record) {
   try {
     // 生成与原始项目一致的文件名: {模型名}_{来源}_{日期}_{时分秒毫秒}.log
@@ -75,8 +86,16 @@ function saveRequestLog(record) {
     const d = new Date(record.timestamp);
     const pad = (n, len = 2) => String(n).padStart(len, '0');
     const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    const timeStr = `${pad(d.getHours())}时${pad(d.getMinutes())}分${pad(d.getSeconds())}秒${pad(d.getMilliseconds(), 3)}`;
+    const timeStr = `${pad(d.getHours())}h${pad(d.getMinutes())}m${pad(d.getSeconds())}s${pad(d.getMilliseconds(), 3)}`;
     const filename = `${model}_${source}_${dateStr}_${timeStr}.log`;
+
+    // 按 项目/session 分目录
+    const projectDir = sanitizeProjectDir(record.projectPath);
+    const sessionDir = record.sessionId || 'unknown';
+    const logDir = path.join(REQUEST_LOG_DIR, projectDir, sessionDir);
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
 
     const ts = `${dateStr} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}`;
     const url = record.requestHeaders?.host
@@ -121,12 +140,13 @@ function saveRequestLog(record) {
     }
     lines.push('');
 
+    const logFilePath = `${projectDir}/${sessionDir}/${filename}`;
     fs.writeFileSync(
-      path.join(REQUEST_LOG_DIR, filename),
+      path.join(logDir, filename),
       lines.join('\n'),
       'utf-8'
     );
-    return filename;
+    return logFilePath;
   } catch (err) {
     console.error('[日志] 写入失败:', err.message);
     return null;
@@ -325,7 +345,7 @@ function injectTemplate(body, rawHeaders) {
 
 // ========== Express 应用 ==========
 const app = express();
-app.use(cors());
+app.use(cors({ origin: ['http://localhost:3000', 'http://127.0.0.1:3000'] }));
 
 // 解析 JSON body（保留原始 buffer 用于转发，跳过 /__proxy__/ 路径）
 app.use((req, res, next) => {
@@ -436,18 +456,22 @@ app.get('/__proxy__/template', (req, res) => {
 });
 
 // ========== 日志文件读取 API ==========
-app.get('/__proxy__/log/:filename', (req, res) => {
-  const filename = req.params.filename;
+// 支持 sessionId/filename 格式的路径
+app.get('/__proxy__/log/*', (req, res) => {
+  const filePath = req.params[0];
   // 安全检查：防止路径遍历
-  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-    return res.status(400).send('非法文件名');
+  if (filePath.includes('..')) {
+    return res.status(400).send('Invalid filename');
   }
-  const logPath = path.join(TEMPLATE_DIR, '..', 'requestLog', filename);
+  const logPath = path.resolve(REQUEST_LOG_DIR, filePath);
+  if (!logPath.startsWith(path.resolve(REQUEST_LOG_DIR))) {
+    return res.status(400).send('Invalid filename');
+  }
   try {
     const content = fs.readFileSync(logPath, 'utf-8');
     res.type('text/plain; charset=utf-8').send(content);
   } catch (e) {
-    res.status(404).send('日志文件不存在: ' + filename);
+    res.status(404).send('日志文件不存在: ' + filePath);
   }
 });
 
@@ -664,7 +688,7 @@ app.all('*', (req, res) => {
 // ========== 启动服务 ==========
 loadTemplate();
 
-server.listen(PROXY_PORT, () => {
+server.listen(PROXY_PORT, '127.0.0.1', () => {
   console.log('');
   console.log('╔══════════════════════════════════════════════════════════════╗');
   console.log('║   Claude Code 请求监听代理服务 (增强版)                     ║');

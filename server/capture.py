@@ -33,6 +33,17 @@ def _ensure_dir(d):
         os.makedirs(d, exist_ok=True)
 
 
+def _sanitize_project_dir(project_path):
+    """将项目路径转为安全的目录名：取最后两级路径，用 _ 连接"""
+    if not project_path:
+        return "unknown-project"
+    # 统一分隔符，取最后两级
+    parts = [p for p in project_path.replace("\\", "/").split("/") if p]
+    tail = "_".join(parts[-2:]) if len(parts) >= 2 else (parts[0] if parts else "unknown-project")
+    # 替换非法文件名字符
+    return re.sub(r'[<>:"|?*]', '_', tail) or "unknown-project"
+
+
 def _push_to_proxy(message: dict):
     """通过 HTTP POST 推送数据到 Express 代理（后台线程，不阻塞 mitmproxy）"""
     def _do_push():
@@ -159,6 +170,27 @@ def request(flow: http.HTTPFlow):
     from_cli = "claude-cli/" in ua
     flow.metadata["capture_from_cli"] = from_cli
 
+    # 提取 session ID
+    session_id = "unknown"
+    metadata = body.get("metadata", {})
+    user_id = metadata.get("user_id", "") if isinstance(metadata, dict) else ""
+    sid_match = re.search(r"session_([a-f0-9-]+)$", user_id)
+    if sid_match:
+        session_id = sid_match.group(1)
+    flow.metadata["capture_session_id"] = session_id
+
+    # 提取项目路径 (从 system 块中的 "Primary working directory: xxx")
+    project_path = ""
+    system_blocks = body.get("system", [])
+    if isinstance(system_blocks, list):
+        for block in system_blocks:
+            if isinstance(block, dict) and block.get("text"):
+                path_match = re.search(r"Primary working directory:\s*(.+)", block["text"])
+                if path_match:
+                    project_path = path_match.group(1).strip()
+                    break
+    flow.metadata["capture_project_path"] = project_path
+
     # 推送给前端
     record = {
         "id": request_id,
@@ -175,6 +207,7 @@ def request(flow: http.HTTPFlow):
         "fromCli": from_cli,
         "injected": False,
         "fromMitmproxy": True,
+        "sessionId": session_id if session_id != "unknown" else None,
     }
     _push_to_proxy({"type": "new_request", "data": record})
 
@@ -245,12 +278,17 @@ def response(flow: http.HTTPFlow):
     ts = flow.metadata.get("capture_ts", time.strftime("%Y-%m-%d %H:%M:%S.000"))
     ts_file = flow.metadata.get("capture_ts_file", time.strftime("%Y-%m-%d_%H-%M-%S.000"))
 
+    # 按 项目/session 分子目录保存
+    project_path = flow.metadata.get("capture_project_path", "")
+    project_dir = _sanitize_project_dir(project_path)
+    session_id = flow.metadata.get("capture_session_id", "unknown")
+    log_dir = os.path.join(LOG_DIR, project_dir, session_id)
+    _ensure_dir(log_dir)
+
     # 文件名格式: 模型_mitm_时间戳.log
     model = req_body.get("model", "unknown") if req_body else "unknown"
     log_filename = f"{model}_mitm_{ts_file}.log"
-    log_path = os.path.join(LOG_DIR, log_filename)
-
-    _ensure_dir(LOG_DIR)
+    log_path = os.path.join(log_dir, log_filename)
     with open(log_path, "w", encoding="utf-8") as f:
         f.write(f"{'='*80}\n")
         f.write(f"请求时间: {ts}\n")
@@ -282,6 +320,7 @@ def response(flow: http.HTTPFlow):
         f.write("\n")
 
     # 单次推送：包含 responseHeaders + responseBody + statusCode + logFile
+    log_file_path = f"{project_dir}/{session_id}/{log_filename}"
     _push_to_proxy({
         "type": "request_complete",
         "data": {
@@ -291,7 +330,7 @@ def response(flow: http.HTTPFlow):
             "responseHeaders": resp_headers,
             "responseBody": response_body,
             "rawResponseText": response_text,
-            "logFile": log_filename,
+            "logFile": log_file_path,
         }
     })
 

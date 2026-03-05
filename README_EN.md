@@ -22,17 +22,35 @@ Claude Devtools is a local debugging tool for Claude Code developers. It renders
 
 ![Session Traces](images/sessionTraces.png)
 
-- Browse projects & sessions in the left sidebar
-- Canvas renders USER / ASSISTANT / TOOL / TASK / SUBAGENT nodes as a DAG
-- Search, collapse chains, and expand detail panels
+<table>
+<tr><td><b>Sidebar</b></td><td>Browse all project directories, expand to see session lists with event counts, timestamps, and subagent badges</td></tr>
+<tr><td><b>Stats Bar</b></td><td>Top bar summarizes events, chains, junctions for the current session, broken down by type (user / assistant / tool-call / subagent, etc.)</td></tr>
+<tr><td><b>Search</b></td><td>Filter nodes to quickly locate target events</td></tr>
+<tr><td><b>DAG Canvas</b></td><td>Interactive directed graph laid out vertically by timestamp, nodes color-coded by type: USER (blue) / ASSISTANT (green) / TOOL (orange) / TASK (teal); task nodes branch right to show subagent chains</td></tr>
+<tr><td><b>Collapsed Chains</b></td><td>Linear non-branching events auto-collapse into a single node showing event count and type labels; click to expand in a side panel</td></tr>
+</table>
 
-### Live Monitor — Real-time API Monitoring
+### Live Monitor — Structured Request Parsing
 
-![Live Monitor](images/liveMonitor.png)
+![Live Monitor - Parameter Parsing](images/liveMonitor_paramParse.png)
 
-- Left panel shows a live list of every API call made by Claude Code CLI
-- Right panel displays structured request body: model, messages, system, tools, metadata, thinking, token usage, etc.
-- Automatic aggregation of input / output / cache tokens
+<table>
+<tr><td><b>Connection Status</b></td><td>Top bar shows WebSocket connection state and request count</td></tr>
+<tr><td><b>Session Filter</b></td><td>Switch between request streams from different Claude Code instances by session ID</td></tr>
+<tr><td><b>Token Stats</b></td><td>Real-time aggregation of output / input / cache_read / cache_creation tokens and total cost</td></tr>
+<tr><td><b>Request List</b></td><td>Left panel lists each API call chronologically, showing model, message count, tool count, and status code</td></tr>
+<tr><td><b>Structured Parsing</b></td><td>Right panel breaks down the request body into semantic modules: model, conversation turns (user/assistant pairs), system prompt blocks, tool definitions, metadata, max_tokens, temperature, stream — each collapsible</td></tr>
+</table>
+
+### Live Monitor — Conversation Turn Expansion
+
+![Live Monitor - Conversation Details](images/liveMonitor_request.png)
+
+<table>
+<tr><td><b>Conversation Turns</b></td><td>Expand "conversation history" to inspect the full content of each user/assistant exchange</td></tr>
+<tr><td><b>Content Block Types</b></td><td>Each turn is split by content block: text (text reply), tool_use (tool call with arguments), tool_result (tool return value), thinking (reasoning process)</td></tr>
+<tr><td><b>Code Display</b></td><td>tool_use arguments render as code, making it easy to review the actual Bash commands, file edits, and other operations the Agent issued</td></tr>
+</table>
 
 ---
 
@@ -41,13 +59,15 @@ Claude Devtools is a local debugging tool for Claude Code developers. It renders
 | Feature | Description |
 |---------|-------------|
 | **DAG Visualization** | Renders session events as a directed graph with node types: USER / ASSISTANT / TOOL / TASK / HOOK / SUBAGENT |
-| **Subagent Branching** | Task nodes branch right, subagent chains run in parallel columns |
+| **Subagent Branching** | Task nodes branch right, subagent chains run in parallel columns, clearly showing multi-agent collaboration |
 | **Time-based Layout** | Y-axis follows timestamps; parallel chains align; sequential segments use compact spacing |
-| **Chain Collapsing** | Linear non-branching nodes auto-collapse; click to expand in a side panel |
+| **Chain Collapsing** | Linear non-branching nodes auto-collapse; click to expand details in a side panel |
 | **Event Detail Panel** | Click any node to inspect metadata, content blocks, thinking, tool inputs/results, raw YAML/JSON |
-| **Session Browser** | Sidebar lists all projects and sessions with event counts and timestamps |
-| **Real-time Monitoring** | Captures Claude Code CLI API traffic via mitmproxy with WebSocket live push |
-| **Template Capture** | Auto-saves system prompts and tool definitions for reuse |
+| **Session Browser** | Sidebar lists all projects and sessions with event counts, timestamps, and subagent badges |
+| **Real-time Monitoring** | Captures every Claude Code CLI API call via mitmproxy, pushed to browser over WebSocket |
+| **Structured Request Parsing** | Breaks API request body into semantic modules: model / messages / system / tools / metadata |
+| **Conversation Replay** | Expand each user-assistant turn to see full content, tool call arguments, and return values |
+| **Live Token Stats** | Aggregates output / input / cache_read / cache_creation token counts and cumulative cost |
 
 ---
 
